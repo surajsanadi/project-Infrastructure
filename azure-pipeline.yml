@@ -1,0 +1,81 @@
+trigger: none
+
+pool:
+  name: 'shivalik-pool'
+
+variables:
+  - group: vmpasswd                         # contains secret: vm-password
+  - name: terraformVersion
+    value: '1.6.6'
+  - name: azureServiceConnection
+    value: 'shivalik-service'
+  - name: backendResourceGroup
+    value: 'Chidu-RG'
+  - name: backendStorageAccount
+    value: 'eval4adosa'
+  - name: backendContainer
+    value: 'demo123'
+  - name: backendKey
+    value: 'shivalik-single-vm.tfstate'     # ← separate state file for this infra
+
+stages:
+
+- stage: Terraform_Deploy
+  displayName: 'Terraform Deploy'
+  jobs:
+  - job: TerraformDeploy
+    displayName: 'Init → Validate → Plan → Apply'
+    steps:
+
+    - checkout: self
+
+    # ── Install Terraform ──────────────────
+    - task: TerraformInstaller@1
+      displayName: 'Install Terraform $(terraformVersion)'
+      inputs:
+        terraformVersion: $(terraformVersion)
+
+    # ── Init ──────────────────────────────
+    - task: TerraformTaskV4@4
+      displayName: '1 · terraform init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        backendServiceArm: $(azureServiceConnection)
+        backendAzureRmResourceGroupName: $(backendResourceGroup)
+        backendAzureRmStorageAccountName: $(backendStorageAccount)
+        backendAzureRmContainerName: $(backendContainer)
+        backendAzureRmKey: $(backendKey)
+        commandOptions: '-reconfigure'
+
+    # ── Validate ──────────────────────────
+    - task: TerraformTaskV4@4
+      displayName: '2 · terraform validate'
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+
+    # ── Plan ──────────────────────────────
+    # vm-password comes from the vmpasswd variable group in Library.
+    # It is passed as a Terraform variable at plan time so it never
+    # appears in logs (sensitive = true in variables.tf).
+    - task: TerraformTaskV4@4
+      displayName: '3 · terraform plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        environmentServiceNameAzureRM: $(azureServiceConnection)
+        commandOptions: >-
+          -var="admin_password=$(vm-password)"
+          -out=$(Build.ArtifactStagingDirectory)/tfplan
+
+    # ── Apply ─────────────────────────────
+    # Resources are ONLY created here.
+    # Pipeline is trigger:none so manual Run = your approval.
+    - task: TerraformTaskV4@4
+      displayName: '4 · terraform apply'
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        environmentServiceNameAzureRM: $(azureServiceConnection)
+        commandOptions: '-auto-approve $(Build.ArtifactStagingDirectory)/tfplan'
