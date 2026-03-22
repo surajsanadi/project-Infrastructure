@@ -79,13 +79,7 @@ resource "azurerm_subnet" "subnet2" {
 # ─────────────────────────────────────────
 # PUBLIC IP — VM
 # ─────────────────────────────────────────
-resource "azurerm_public_ip" "pip" {
-  name                = "shivalik-pip"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Static"
-  sku                 = "Standard"
-}
+
 
 # ─────────────────────────────────────────
 # NIC — VM NIC attached to subnet1 with public IP
