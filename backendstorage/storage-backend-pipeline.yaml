@@ -10,6 +10,7 @@ variables:
   backendStorageAccount: chiduadosa
   backendContainer: terraformado
   backendKey: storage-acc.tfstate
+  workingDirectory: $(System.DefaultWorkingDirectory)/backendstorage  # ← added
 
 stages:
 # ---------------- INIT ----------------
@@ -28,6 +29,7 @@ stages:
       inputs:
         provider: azurerm
         command: init
+        workingDirectory: $(workingDirectory)
         backendServiceArm: $(azureServiceConnection)
         backendAzureRmResourceGroupName: $(backendResourceGroup)
         backendAzureRmStorageAccountName: $(backendStorageAccount)
@@ -52,6 +54,7 @@ stages:
       inputs:
         provider: azurerm
         command: init
+        workingDirectory: $(workingDirectory)
         backendServiceArm: $(azureServiceConnection)
         backendAzureRmResourceGroupName: $(backendResourceGroup)
         backendAzureRmStorageAccountName: $(backendStorageAccount)
@@ -64,6 +67,7 @@ stages:
       inputs:
         provider: azurerm
         command: plan
+        workingDirectory: $(workingDirectory)        # ← added
         environmentServiceNameAzureRM: $(azureServiceConnection)
 
 # ---------------- APPLY ----------------
@@ -78,6 +82,8 @@ stages:
       runOnce:
         deploy:
           steps:
+          - checkout: self                            # ← added
+
           - task: TerraformInstaller@1
             displayName: Install Terraform
             inputs:
@@ -88,6 +94,7 @@ stages:
             inputs:
               provider: azurerm
               command: init
+              workingDirectory: $(workingDirectory)
               backendServiceArm: $(azureServiceConnection)
               backendAzureRmResourceGroupName: $(backendResourceGroup)
               backendAzureRmStorageAccountName: $(backendStorageAccount)
@@ -100,5 +107,6 @@ stages:
             inputs:
               provider: azurerm
               command: apply
+              workingDirectory: $(workingDirectory)
               environmentServiceNameAzureRM: $(azureServiceConnection)
               commandOptions: -auto-approve
