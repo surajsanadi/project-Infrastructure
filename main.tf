@@ -14,7 +14,7 @@ variable "location" {
 
 variable "rg_name" {
   default = "shivalik-rg"
-  type    = string
+  type    = istring
 }
 
 # ─────────────────────────────────────────
