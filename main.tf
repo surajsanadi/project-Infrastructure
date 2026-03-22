@@ -35,7 +35,7 @@ resource "azurerm_network_security_group" "nsg" {
 
   security_rule {
     name                       = "allow-ssh"
-    priority                   = 100
+    priority                   = 200
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
