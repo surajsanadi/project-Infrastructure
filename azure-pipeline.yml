@@ -39,11 +39,6 @@ stages:
     steps:
     - checkout: self
 
-    # ── Register Azure resource providers ──────────────────────────────────
-    # Runs once per pipeline execution. Idempotent — safe to run even if
-    # providers are already registered. Fixes MissingSubscriptionRegistration
-    # 409 errors for Microsoft.App, Microsoft.Web, Microsoft.OperationalInsights.
-    # ──────────────────────────────────────────────────────────────────────
     - task: AzureCLI@2
       displayName: Register Azure Resource Providers
       inputs:
@@ -75,6 +70,15 @@ stages:
       displayName: Install Terraform
       inputs:
         terraformVersion: $(terraformVersion)
+
+    - task: Bash@3
+      displayName: Clean Terraform Cache        # ← added
+      inputs:
+        targetType: inline
+        script: |
+          rm -rf $(terraformDirectory)/.terraform
+          rm -f $(terraformDirectory)/.terraform.lock.hcl
+          echo "Terraform cache cleaned"
 
     - task: TerraformTaskV4@4
       displayName: Terraform Init
@@ -109,10 +113,6 @@ stages:
     steps:
     - checkout: self
 
-    # ── Re-verify providers are registered before Plan ─────────────────────
-    # Each stage runs on a fresh agent context so we verify again.
-    # Already-registered providers complete in seconds — no wait needed.
-    # ──────────────────────────────────────────────────────────────────────
     - task: AzureCLI@2
       displayName: Register Azure Resource Providers
       inputs:
@@ -135,6 +135,15 @@ stages:
       displayName: Install Terraform
       inputs:
         terraformVersion: $(terraformVersion)
+
+    - task: Bash@3
+      displayName: Clean Terraform Cache        # ← added
+      inputs:
+        targetType: inline
+        script: |
+          rm -rf $(terraformDirectory)/.terraform
+          rm -f $(terraformDirectory)/.terraform.lock.hcl
+          echo "Terraform cache cleaned"
 
     - task: TerraformTaskV4@4
       displayName: Terraform Init
@@ -171,7 +180,7 @@ stages:
     - task: PublishPipelineArtifact@1
       displayName: Publish Plan Artifact
       inputs:
-        targetPath: '$(Build.ArtifactStagingDirectory)/tfplan'
+        targetPath: '$(Build.ArtifactStagingDirectory)'   # ← fixed: publish directory not file
         artifact: 'tfplan'
 
 
@@ -191,9 +200,6 @@ stages:
           steps:
           - checkout: self
 
-          # ── Re-verify providers before Apply ─────────────────────────────
-          # Deployment jobs run in a separate context — verify one more time.
-          # ─────────────────────────────────────────────────────────────────
           - task: AzureCLI@2
             displayName: Register Azure Resource Providers
             inputs:
@@ -216,6 +222,15 @@ stages:
             displayName: Install Terraform
             inputs:
               terraformVersion: $(terraformVersion)
+
+          - task: Bash@3
+            displayName: Clean Terraform Cache      # ← added
+            inputs:
+              targetType: inline
+              script: |
+                rm -rf $(terraformDirectory)/.terraform
+                rm -f $(terraformDirectory)/.terraform.lock.hcl
+                echo "Terraform cache cleaned"
 
           - task: TerraformTaskV4@4
             displayName: Terraform Init
