@@ -9,7 +9,7 @@ terraform {
     }
   }
   required_version = ">= 1.6.6"
-  backend "local" {}        # ← only line added
+  
 }
 
 provider "azurerm" {
