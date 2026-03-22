@@ -4,7 +4,7 @@ resource "azurerm_resource_group" "resgroup" {
 }
 
 resource "azurerm_storage_account" "stacc" {
-  name                     = "newstorage123"
+  name                     = "statefilestorage"
   resource_group_name      = azurerm_resource_group.resgroup.name
   location                 = azurerm_resource_group.resgroup.location
   account_tier             = "Standard"
