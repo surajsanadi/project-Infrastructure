@@ -1,0 +1,74 @@
+##################################################
+# Terraform Core
+##################################################
+
+# Local .terraform directories
+**/.terraform/*
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Terraform lock file (OPTIONAL - see note below)
+# Comment this line if you want to version lock providers
+# .terraform.lock.hcl
+
+##################################################
+# Terraform Variables
+##################################################
+
+# Sensitive variable files
+*.tfvars
+*.tfvars.json
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+##################################################
+# CLI configuration files
+##################################################
+
+.terraformrc
+terraform.rc
+
+##################################################
+# Azure / AZD
+##################################################
+
+.azure/
+.env
+.env.*
+
+##################################################
+# OS / Editor files
+##################################################
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# JetBrains
+.idea/
+
+##################################################
+# Logs
+##################################################
+
+*.log
+
+##################################################
+# Backup files
+##################################################
+
+*.bak
+*.backup
+*.swp
