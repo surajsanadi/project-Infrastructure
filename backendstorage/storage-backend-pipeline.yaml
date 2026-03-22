@@ -1,15 +1,12 @@
 trigger: none
 
 pool:
-  name: First-pool
+  name: Project-azure
 
 variables:
   terraformVersion: 1.6.6
-  azureServiceConnection: ado-sa
-  backendResourceGroup: Chidu-RG
-  backendStorageAccount: chiduadosa
-  backendContainer: terraformado
-  backendKey: storage-acc.tfstate
+  azureServiceConnection: ado-azure
+  workingDirectory: $(System.DefaultWorkingDirectory)/backendstorage
 
 stages:
 # ---------------- INIT ----------------
@@ -28,12 +25,8 @@ stages:
       inputs:
         provider: azurerm
         command: init
-        backendServiceArm: $(azureServiceConnection)
-        backendAzureRmResourceGroupName: $(backendResourceGroup)
-        backendAzureRmStorageAccountName: $(backendStorageAccount)
-        backendAzureRmContainerName: $(backendContainer)
-        backendAzureRmKey: $(backendKey)
-        commandOptions: -reconfigure
+        workingDirectory: $(workingDirectory)
+        environmentServiceNameAzureRM: $(azureServiceConnection)
 
 # ---------------- PLAN ----------------
 - stage: Terraform_Plan
@@ -52,18 +45,15 @@ stages:
       inputs:
         provider: azurerm
         command: init
-        backendServiceArm: $(azureServiceConnection)
-        backendAzureRmResourceGroupName: $(backendResourceGroup)
-        backendAzureRmStorageAccountName: $(backendStorageAccount)
-        backendAzureRmContainerName: $(backendContainer)
-        backendAzureRmKey: $(backendKey)
-        commandOptions: -reconfigure
+        workingDirectory: $(workingDirectory)
+        environmentServiceNameAzureRM: $(azureServiceConnection)
 
     - task: TerraformTaskV4@4
       displayName: Terraform Plan
       inputs:
         provider: azurerm
         command: plan
+        workingDirectory: $(workingDirectory)
         environmentServiceNameAzureRM: $(azureServiceConnection)
 
 # ---------------- APPLY ----------------
@@ -78,6 +68,8 @@ stages:
       runOnce:
         deploy:
           steps:
+          - checkout: self
+
           - task: TerraformInstaller@1
             displayName: Install Terraform
             inputs:
@@ -88,17 +80,14 @@ stages:
             inputs:
               provider: azurerm
               command: init
-              backendServiceArm: $(azureServiceConnection)
-              backendAzureRmResourceGroupName: $(backendResourceGroup)
-              backendAzureRmStorageAccountName: $(backendStorageAccount)
-              backendAzureRmContainerName: $(backendContainer)
-              backendAzureRmKey: $(backendKey)
-              commandOptions: -reconfigure
+              workingDirectory: $(workingDirectory)
+              environmentServiceNameAzureRM: $(azureServiceConnection)
 
           - task: TerraformTaskV4@4
             displayName: Terraform Apply
             inputs:
               provider: azurerm
               command: apply
+              workingDirectory: $(workingDirectory)
               environmentServiceNameAzureRM: $(azureServiceConnection)
               commandOptions: -auto-approve
