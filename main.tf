@@ -3,7 +3,7 @@
 # ─────────────────────────────────────────
 variable "admin_password" {
   description = "Password for VM login (azureuser)"
-  type        = string
+  type        = set
   sensitive   = true
 }
 
