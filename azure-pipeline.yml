@@ -1,7 +1,7 @@
 trigger: none
 
 pool:
-  name: new-pool
+  name: Project-azure
 
 variables:
 - group: vmpasswd
@@ -10,19 +10,19 @@ variables:
   value: 1.6.6
 
 - name: azureServiceConnection
-  value: 'new-service'
+  value: 'ado-azure'
 
 - name: backendResourceGroup
-  value: 'inchararg'
+  value: 'resgroup'
 
 - name: backendStorageAccount
-  value: inchsa
+  value: shivalikstatefiles
 
 - name: backendContainer
-  value: inch123
+  value: container123
 
 - name: backendKey
-  value: ok.tfstate
+  value: Infra.tfstate
 
 - name: terraformDirectory
   value: $(System.DefaultWorkingDirectory)
