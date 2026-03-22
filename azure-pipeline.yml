@@ -1,81 +1,254 @@
 trigger: none
 
 pool:
-  name: 'shivalik-pool'
+  name: new-pool
 
 variables:
-  - group: vmpasswd                         # contains secret: vm-password
-  - name: terraformVersion
-    value: '1.6.6'
-  - name: azureServiceConnection
-    value: 'shivalik-service'
-  - name: backendResourceGroup
-    value: 'Chidu-RG'
-  - name: backendStorageAccount
-    value: 'eval4adosa'
-  - name: backendContainer
-    value: 'demo123'
-  - name: backendKey
-    value: 'shivalik-single-vm.tfstate'     # ← separate state file for this infra
+- group: vmpasswd
+
+- name: terraformVersion
+  value: 1.6.6
+
+- name: azureServiceConnection
+  value: 'new-service'
+
+- name: backendResourceGroup
+  value: 'inchararg'
+
+- name: backendStorageAccount
+  value: inchsa
+
+- name: backendContainer
+  value: inch123
+
+- name: backendKey
+  value: ok.tfstate
+
+- name: terraformDirectory
+  value: $(System.DefaultWorkingDirectory)
 
 stages:
 
-- stage: Terraform_Deploy
-  displayName: 'Terraform Deploy'
+# ================================
+# INIT STAGE
+# ================================
+- stage: Terraform_Init
+  displayName: Terraform Init
   jobs:
-  - job: TerraformDeploy
-    displayName: 'Init → Validate → Plan → Apply'
+  - job: Init
     steps:
-
     - checkout: self
 
-    # ── Install Terraform ──────────────────
+    # ── Register Azure resource providers ──────────────────────────────────
+    # Runs once per pipeline execution. Idempotent — safe to run even if
+    # providers are already registered. Fixes MissingSubscriptionRegistration
+    # 409 errors for Microsoft.App, Microsoft.Web, Microsoft.OperationalInsights.
+    # ──────────────────────────────────────────────────────────────────────
+    - task: AzureCLI@2
+      displayName: Register Azure Resource Providers
+      inputs:
+        azureSubscription: $(azureServiceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          echo "=== Registering resource providers ==="
+          az provider register --namespace Microsoft.App                 --wait
+          az provider register --namespace Microsoft.Web                 --wait
+          az provider register --namespace Microsoft.Insights            --wait
+          az provider register --namespace Microsoft.OperationalInsights --wait
+          az provider register --namespace Microsoft.ContainerRegistry   --wait
+          az provider register --namespace Microsoft.Storage             --wait
+          az provider register --namespace Microsoft.Compute             --wait
+          az provider register --namespace Microsoft.Network             --wait
+          echo "=== Verifying registration status ==="
+          az provider show --namespace Microsoft.App                 --query "registrationState" -o tsv
+          az provider show --namespace Microsoft.Web                 --query "registrationState" -o tsv
+          az provider show --namespace Microsoft.Insights            --query "registrationState" -o tsv
+          az provider show --namespace Microsoft.OperationalInsights --query "registrationState" -o tsv
+          az provider show --namespace Microsoft.ContainerRegistry   --query "registrationState" -o tsv
+          az provider show --namespace Microsoft.Storage             --query "registrationState" -o tsv
+          az provider show --namespace Microsoft.Compute             --query "registrationState" -o tsv
+          az provider show --namespace Microsoft.Network             --query "registrationState" -o tsv
+          echo "=== All providers registered ==="
+
     - task: TerraformInstaller@1
-      displayName: 'Install Terraform $(terraformVersion)'
+      displayName: Install Terraform
       inputs:
         terraformVersion: $(terraformVersion)
 
-    # ── Init ──────────────────────────────
     - task: TerraformTaskV4@4
-      displayName: '1 · terraform init'
+      displayName: Terraform Init
       inputs:
-        provider: 'azurerm'
-        command: 'init'
+        provider: azurerm
+        command: init
+        workingDirectory: $(terraformDirectory)
         backendServiceArm: $(azureServiceConnection)
         backendAzureRmResourceGroupName: $(backendResourceGroup)
         backendAzureRmStorageAccountName: $(backendStorageAccount)
         backendAzureRmContainerName: $(backendContainer)
         backendAzureRmKey: $(backendKey)
-        commandOptions: '-reconfigure'
+        commandOptions: -reconfigure -upgrade
 
-    # ── Validate ──────────────────────────
-    - task: TerraformTaskV4@4
-      displayName: '2 · terraform validate'
+    - task: Bash@3
+      displayName: Fix Provider Permissions
       inputs:
-        provider: 'azurerm'
-        command: 'validate'
+        targetType: inline
+        script: |
+          find $(Agent.WorkFolder) -name "terraform-provider-*" -exec chmod 755 {} \;
+          echo "Permissions fixed"
 
-    # ── Plan ──────────────────────────────
-    # vm-password comes from the vmpasswd variable group in Library.
-    # It is passed as a Terraform variable at plan time so it never
-    # appears in logs (sensitive = true in variables.tf).
-    - task: TerraformTaskV4@4
-      displayName: '3 · terraform plan'
+
+# ================================
+# PLAN STAGE
+# ================================
+- stage: Terraform_Plan
+  displayName: Terraform Plan
+  dependsOn: Terraform_Init
+  jobs:
+  - job: Plan
+    steps:
+    - checkout: self
+
+    # ── Re-verify providers are registered before Plan ─────────────────────
+    # Each stage runs on a fresh agent context so we verify again.
+    # Already-registered providers complete in seconds — no wait needed.
+    # ──────────────────────────────────────────────────────────────────────
+    - task: AzureCLI@2
+      displayName: Register Azure Resource Providers
       inputs:
-        provider: 'azurerm'
-        command: 'plan'
+        azureSubscription: $(azureServiceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          echo "=== Registering resource providers ==="
+          az provider register --namespace Microsoft.App                 --wait
+          az provider register --namespace Microsoft.Web                 --wait
+          az provider register --namespace Microsoft.Insights            --wait
+          az provider register --namespace Microsoft.OperationalInsights --wait
+          az provider register --namespace Microsoft.ContainerRegistry   --wait
+          az provider register --namespace Microsoft.Storage             --wait
+          az provider register --namespace Microsoft.Compute             --wait
+          az provider register --namespace Microsoft.Network             --wait
+          echo "=== All providers registered ==="
+
+    - task: TerraformInstaller@1
+      displayName: Install Terraform
+      inputs:
+        terraformVersion: $(terraformVersion)
+
+    - task: TerraformTaskV4@4
+      displayName: Terraform Init
+      inputs:
+        provider: azurerm
+        command: init
+        workingDirectory: $(terraformDirectory)
+        backendServiceArm: $(azureServiceConnection)
+        backendAzureRmResourceGroupName: $(backendResourceGroup)
+        backendAzureRmStorageAccountName: $(backendStorageAccount)
+        backendAzureRmContainerName: $(backendContainer)
+        backendAzureRmKey: $(backendKey)
+        commandOptions: -reconfigure -upgrade
+
+    - task: Bash@3
+      displayName: Fix Provider Permissions
+      inputs:
+        targetType: inline
+        script: |
+          find $(Agent.WorkFolder) -name "terraform-provider-*" -exec chmod 755 {} \;
+          echo "Permissions fixed"
+
+    - task: TerraformTaskV4@4
+      displayName: Terraform Plan
+      inputs:
+        provider: azurerm
+        command: plan
+        workingDirectory: $(terraformDirectory)
         environmentServiceNameAzureRM: $(azureServiceConnection)
         commandOptions: >-
           -var="admin_password=$(vm-password)"
           -out=$(Build.ArtifactStagingDirectory)/tfplan
 
-    # ── Apply ─────────────────────────────
-    # Resources are ONLY created here.
-    # Pipeline is trigger:none so manual Run = your approval.
-    - task: TerraformTaskV4@4
-      displayName: '4 · terraform apply'
+    - task: PublishPipelineArtifact@1
+      displayName: Publish Plan Artifact
       inputs:
-        provider: 'azurerm'
-        command: 'apply'
-        environmentServiceNameAzureRM: $(azureServiceConnection)
-        commandOptions: '-auto-approve $(Build.ArtifactStagingDirectory)/tfplan'
+        targetPath: '$(Build.ArtifactStagingDirectory)/tfplan'
+        artifact: 'tfplan'
+
+
+# ================================
+# APPLY STAGE
+# ================================
+- stage: Terraform_Apply
+  displayName: Terraform Apply
+  dependsOn: Terraform_Plan
+  jobs:
+  - deployment: Apply
+    displayName: Apply Terraform
+    environment: linux-vm
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          # ── Re-verify providers before Apply ─────────────────────────────
+          # Deployment jobs run in a separate context — verify one more time.
+          # ─────────────────────────────────────────────────────────────────
+          - task: AzureCLI@2
+            displayName: Register Azure Resource Providers
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                echo "=== Registering resource providers ==="
+                az provider register --namespace Microsoft.App                 --wait
+                az provider register --namespace Microsoft.Web                 --wait
+                az provider register --namespace Microsoft.Insights            --wait
+                az provider register --namespace Microsoft.OperationalInsights --wait
+                az provider register --namespace Microsoft.ContainerRegistry   --wait
+                az provider register --namespace Microsoft.Storage             --wait
+                az provider register --namespace Microsoft.Compute             --wait
+                az provider register --namespace Microsoft.Network             --wait
+                echo "=== All providers registered ==="
+
+          - task: TerraformInstaller@1
+            displayName: Install Terraform
+            inputs:
+              terraformVersion: $(terraformVersion)
+
+          - task: TerraformTaskV4@4
+            displayName: Terraform Init
+            inputs:
+              provider: azurerm
+              command: init
+              workingDirectory: $(terraformDirectory)
+              backendServiceArm: $(azureServiceConnection)
+              backendAzureRmResourceGroupName: $(backendResourceGroup)
+              backendAzureRmStorageAccountName: $(backendStorageAccount)
+              backendAzureRmContainerName: $(backendContainer)
+              backendAzureRmKey: $(backendKey)
+              commandOptions: -reconfigure -upgrade
+
+          - task: Bash@3
+            displayName: Fix Provider Permissions
+            inputs:
+              targetType: inline
+              script: |
+                find $(Agent.WorkFolder) -name "terraform-provider-*" -exec chmod 755 {} \;
+                echo "Permissions fixed"
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download Plan Artifact
+            inputs:
+              artifact: 'tfplan'
+              path: '$(Pipeline.Workspace)/tfplan'
+
+          - task: TerraformTaskV4@4
+            displayName: Terraform Apply
+            inputs:
+              provider: azurerm
+              command: apply
+              workingDirectory: $(terraformDirectory)
+              environmentServiceNameAzureRM: $(azureServiceConnection)
+              commandOptions: '-auto-approve $(Pipeline.Workspace)/tfplan/tfplan'
